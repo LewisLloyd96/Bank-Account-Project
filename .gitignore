@@ -1,0 +1,18 @@
+# Compiled libraries
+*.so
+*.dylib
+*.dll
+*.o
+*.obj
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# IDE / build folders
+.idea/
+.vscode/
+build/
+cmake-build-*/
