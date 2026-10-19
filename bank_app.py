@@ -6,6 +6,7 @@ detection, balance checks) live in the C++ backend.
 
 import ctypes
 import os
+import re
 import sys
 import tkinter as tk
 from ctypes import POINTER, c_char_p, c_double, c_int, c_void_p, create_string_buffer
@@ -46,13 +47,81 @@ class BankApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Bank Management System")
-        self.root.geometry("640x520")
-        self.root.minsize(560, 480)
+        self.root.geometry("900x650")
+        self.root.minsize(720, 560)
+        self.root.configure(background="#F3F6F3")
 
+        style = ttk.Style(self.root)
         try:
-            ttk.Style().theme_use("clam")
+            style.theme_use("clam")
         except tk.TclError:
             pass
+        style.configure("TFrame", background="#F3F6F3")
+        style.configure("TLabel", background="#F3F6F3", foreground="#20352D", font=("Segoe UI", 10))
+        style.configure(
+            "PageHeading.TLabel",
+            background="#F3F6F3",
+            foreground="#174F3D",
+            font=("Segoe UI", 15, "bold"),
+        )
+        style.configure(
+            "TLabelFrame",
+            background="#F3F6F3",
+            bordercolor="#CFDAD2",
+            relief="solid",
+            padding=12,
+        )
+        style.configure(
+            "TLabelFrame.Label",
+            background="#F3F6F3",
+            foreground="#315A49",
+            font=("Segoe UI", 9, "bold"),
+        )
+        style.configure(
+            "TNotebook",
+            background="#F3F6F3",
+            borderwidth=0,
+            tabmargins=(0, 4, 0, 0),
+        )
+        style.configure(
+            "TNotebook.Tab",
+            background="#E2EAE4",
+            foreground="#42594D",
+            padding=(14, 9),
+            font=("Segoe UI", 9, "bold"),
+        )
+        style.map(
+            "TNotebook.Tab",
+            background=[("selected", "#FFFFFF"), ("active", "#D5E2D9")],
+            foreground=[("selected", "#174F3D")],
+        )
+        style.configure(
+            "TButton",
+            background="#176B50",
+            foreground="#FFFFFF",
+            bordercolor="#176B50",
+            padding=(14, 8),
+            font=("Segoe UI", 10, "bold"),
+        )
+        style.map(
+            "TButton",
+            background=[("pressed", "#104B39"), ("active", "#248363")],
+            bordercolor=[("active", "#248363")],
+        )
+        style.configure(
+            "TEntry",
+            fieldbackground="#FFFFFF",
+            foreground="#20352D",
+            bordercolor="#C5D2C9",
+            padding=7,
+        )
+        style.configure(
+            "Status.TLabel",
+            background="#E3EBE5",
+            foreground="#40574B",
+            padding=(10, 7),
+            font=("Segoe UI", 9),
+        )
 
         self.lib = load_bank_library()
         self._setup_ctypes()
@@ -107,25 +176,29 @@ class BankApp:
         self.status_var = tk.StringVar(value="Ready. No client file loaded.")
         ttk.Label(
             self.root, textvariable=self.status_var,
-            relief=tk.SUNKEN, anchor="w", padding=5,
+            style="Status.TLabel", anchor="w",
         ).pack(side="bottom", fill="x")
 
         notebook = ttk.Notebook(self.root)
         notebook.pack(fill="both", expand=True, padx=10, pady=10)
+        self.notebook = notebook
+        self.tab_frames = {}
 
         tabs = [
             (" File ", self._build_file_tab),
             (" Find Client ", self._build_search_tab),
             (" Deposit / Withdraw ", self._build_transaction_tab),
             (" Add Client ", self._build_add_client_tab),
+            (" Help Chat ", self._build_help_chat_tab),
         ]
         for title, builder in tabs:
             frame = ttk.Frame(notebook, padding=10)
             notebook.add(frame, text=title)
+            self.tab_frames[title.strip()] = frame
             builder(frame)
 
     def _build_file_tab(self, parent):
-        ttk.Label(parent, text="File Operations", font=("Helvetica", 13, "bold")).pack(pady=(10, 15))
+        ttk.Label(parent, text="File Operations", style="PageHeading.TLabel").pack(pady=(10, 15))
         ttk.Button(parent, text="Load Client File...", command=self.load_file).pack(pady=8, ipadx=12)
         ttk.Button(parent, text="Save Data To File...", command=self.save_file).pack(pady=8, ipadx=12)
         self.lbl_file = ttk.Label(parent, text="Current file: (none)")
@@ -166,7 +239,7 @@ class BankApp:
         ttk.Button(buttons, text="Deposit", command=self.deposit).pack(side="left", padx=10)
         ttk.Button(buttons, text="Withdraw", command=self.withdraw).pack(side="left", padx=10)
 
-        self.lbl_trans_result = ttk.Label(parent, text="", font=("Helvetica", 11, "italic"))
+        self.lbl_trans_result = ttk.Label(parent, text="", font=("Segoe UI", 11, "italic"))
         self.lbl_trans_result.pack(pady=10)
 
     def _build_add_client_tab(self, parent):
@@ -187,6 +260,126 @@ class BankApp:
 
         ttk.Button(box, text="Add Client", command=self.add_client).grid(
             row=len(fields), column=0, columnspan=2, pady=12
+        )
+
+    def _build_help_chat_tab(self, parent):
+        ttk.Label(parent, text="Banking Help Assistant", style="PageHeading.TLabel").pack(
+            anchor="w", pady=(0, 8)
+        )
+        ttk.Label(
+            parent,
+            text="Ask how to use the app or type a task like 'find an account'.",
+        ).pack(anchor="w", pady=(0, 8))
+
+        chat_frame = ttk.Frame(parent)
+        chat_frame.pack(fill="both", expand=True)
+        self.chat_history = tk.Text(
+            chat_frame,
+            wrap="word",
+            height=12,
+            state="disabled",
+            background="#FFFFFF",
+            foreground="#20352D",
+            insertbackground="#176B50",
+            font=("Segoe UI", 10),
+            padx=12,
+            pady=10,
+            relief="solid",
+            borderwidth=1,
+            highlightthickness=0,
+        )
+        scrollbar = ttk.Scrollbar(chat_frame, orient="vertical", command=self.chat_history.yview)
+        self.chat_history.configure(yscrollcommand=scrollbar.set)
+        self.chat_history.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        self._append_chat_message(
+            "Assistant",
+            "Hi! I can guide you to the right screen and answer questions about loading "
+            "files, finding accounts, transactions, and adding clients.",
+        )
+
+        compose = ttk.Frame(parent)
+        compose.pack(fill="x", pady=(8, 0))
+        self.chat_entry = ttk.Entry(compose)
+        self.chat_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        self.chat_entry.bind("<Return>", self._send_chat_message)
+        ttk.Button(compose, text="Send", command=self._send_chat_message).pack(side="right")
+
+    def _append_chat_message(self, speaker, message):
+        self.chat_history.configure(state="normal")
+        self.chat_history.insert(tk.END, f"{speaker}: {message}\n\n")
+        self.chat_history.configure(state="disabled")
+        self.chat_history.see(tk.END)
+
+    def _send_chat_message(self, _event=None):
+        message = self.chat_entry.get().strip()
+        if not message:
+            return "break"
+
+        self.chat_entry.delete(0, tk.END)
+        self._append_chat_message("You", message)
+        answer, destination = self._assistant_response(message)
+        self._append_chat_message("Assistant", answer)
+        if destination:
+            self.notebook.select(self.tab_frames[destination])
+        return "break"
+
+    @staticmethod
+    def _assistant_response(message):
+        """Answer app FAQs and direct common tasks to their notebook tabs."""
+        text = " ".join(message.lower().replace("/", " ").split())
+        has_phrase = lambda *phrases: any(
+            re.search(rf"\b{re.escape(phrase)}\b", text) for phrase in phrases
+        )
+
+        if has_phrase("withdraw", "withdrawal"):
+            return (
+                "Enter the account number and a positive amount on the Deposit / Withdraw tab, "
+                "then choose Withdraw.",
+                "Deposit / Withdraw",
+            )
+        if has_phrase("deposit"):
+            return (
+                "Enter the account number and a positive amount on the Deposit / Withdraw tab, "
+                "then choose Deposit.",
+                "Deposit / Withdraw",
+            )
+        if has_phrase("add client", "new client", "new account", "open account"):
+            return (
+                "Use the Add Client tab to enter an account number, full name, SSN, and initial balance.",
+                "Add Client",
+            )
+        if has_phrase("amount", "zero", "negative", "validation"):
+            return (
+                "Deposits and withdrawals require an amount greater than zero. A new client's "
+                "initial balance may be zero, but not negative.",
+                None,
+            )
+        if has_phrase("find", "search", "look up", "lookup", "balance"):
+            return (
+                "Open Find Client, enter the account number, and select Find. The displayed SSN is masked.",
+                "Find Client",
+            )
+        if has_phrase("load", "open file", "import"):
+            return (
+                "Use the File tab and select Load Client File. The app accepts CSV or text files.",
+                "File",
+            )
+        if has_phrase("save", "export"):
+            return (
+                "Use the File tab and select Save Data To File to choose where to save the client data.",
+                "File",
+            )
+        if has_phrase("help", "what can you do", "faq", "questions"):
+            return (
+                "I can help with loading or saving a client file, finding an account, deposits, "
+                "withdrawals, and adding a client. Ask me about one of those tasks.",
+                None,
+            )
+        return (
+            "I can help with files, finding accounts, deposits, withdrawals, or adding clients. "
+            "What would you like to do?",
+            None,
         )
 
     # ------------------------------------------------------------------
