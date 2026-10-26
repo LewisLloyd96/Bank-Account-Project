@@ -21,7 +21,6 @@ The Tkinter app loads `bank.dll` from this folder. Build that library before lau
 
 The same build command can be run in PowerShell if the MinGW-w64 `bin` directory is on `PATH`.
 
-```markdown
 
 ## Build on macOS
 
