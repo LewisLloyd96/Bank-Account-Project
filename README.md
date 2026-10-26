@@ -54,4 +54,3 @@ Notes:
 - Make sure `bank_app.py` loads `libbank.dylib` on macOS (instead of `bank.dll`).
 - If using Homebrew Python, install Tkinter with `brew install python-tk`.
 - Python and the library must match architecture (arm64 vs x86_64).
-```
